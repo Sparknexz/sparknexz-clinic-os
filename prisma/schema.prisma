@@ -1,0 +1,176 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Clinic {
+  id           String         @id @default(cuid())
+  name         String
+  slug         String         @unique
+  type         ClinicType
+  address      String?
+  phone        String?
+  logoUrl      String?
+  themeColor   String?        @default("#0ea5e9")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  users        User[]
+  patients     Patient[]
+  appointments Appointment[]
+  prescriptions Prescription[]
+  vaccinations Vaccination[]
+  invoices     Invoice[]
+  notificationLogs NotificationLog[]
+}
+
+enum ClinicType {
+  HUMAN
+  VET
+}
+
+model User {
+  id        String    @id @default(cuid())
+  clinicId  String?
+  name      String
+  email     String    @unique
+  password  String
+  role      UserRole
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  clinic    Clinic?   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  DOCTOR
+  RECEPTIONIST
+}
+
+model Patient {
+  id          String   @id @default(cuid())
+  clinicId    String
+  ownerName   String
+  phone       String
+  age         Int?
+  gender      String?
+  petName     String?
+  petSpecies  String?
+  petBreed    String?
+  petWeight   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  prescriptions Prescription[]
+  vaccinations Vaccination[]
+  notificationLogs NotificationLog[]
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  clinicId    String
+  patientId   String
+  date        DateTime
+  slot        String
+  tokenNumber Int
+  status      AppointmentStatus @default(WAITING)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  prescription Prescription?
+  invoice      Invoice?
+}
+
+enum AppointmentStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Prescription {
+  id             String   @id @default(cuid())
+  clinicId       String
+  appointmentId  String   @unique
+  patientId      String
+  symptoms       String?
+  diagnosis      String?
+  medicinesJson  String?
+  nextVisitDate  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clinic      Clinic      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Vaccination {
+  id               String   @id @default(cuid())
+  clinicId         String
+  patientId        String
+  vaccineName      String
+  administeredDate DateTime
+  nextDueDate      DateTime?
+  reminderSent     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  clinicId        String
+  appointmentId   String        @unique
+  consultationFee Float
+  extraCharges    Float         @default(0)
+  totalAmount     Float
+  paymentMode     String?
+  status          InvoiceStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  clinic      Clinic      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+}
+
+enum InvoiceStatus {
+  PAID
+  PENDING
+}
+
+model NotificationLog {
+  id        String           @id @default(cuid())
+  clinicId  String
+  patientId String?
+  phone     String
+  type      NotificationType
+  message   String
+  status    String           @default("LOGGED")
+  createdAt DateTime         @default(now())
+
+  clinic  Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMATION
+  PRESCRIPTION_READY
+  VISIT_REMINDER
+  VACCINE_REMINDER
+}
